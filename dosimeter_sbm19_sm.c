@@ -27,9 +27,6 @@
 **************************************************************************
 */
 
-	#define	 START_VALUE	750
-	#define		VALUE_ARRAY_CNT	100
-
 /*
 **************************************************************************
 *							LOCAL CONSTANTS
@@ -81,18 +78,19 @@ const unsigned long port_mask_UL[] = {
 	1UL<<0x0F		/* 15 LED PC 15 */
  };
 
-volatile 	uint8_t tim3_flag_u8 		= 0;
-volatile 	uint32_t time_between_electrons_u32 		= 0;
-			uint8_t led_count_u8	= 0;
-			uint32_t radiation_u32_arr[VALUE_ARRAY_CNT];
-	int		count_electrons_i = 0;
+uint8_t 	tim3_flag_u8 			= 0;
+uint8_t		update_flag_u8 			= 0;
+uint8_t 	led_count_u8			= 0;
+uint8_t		electron_array_count_u8	= 0;
+uint32_t	electron_hard_count_u32	= 0;
+uint32_t 	radiation_u32_arr[VALUE_ARRAY_CNT];
 
 /*
 **************************************************************************
 *                        LOCAL FUNCTION PROTOTYPES
 **************************************************************************
 */
-
+	void LED_Blink(uint8_t _position_u8);
 	void Print_radiation(uint32_t _radiation_u32);
 
 	void Port_A_Off (uint8_t _bit_u8);
@@ -138,11 +136,22 @@ volatile 	uint32_t time_between_electrons_u32 		= 0;
 **************************************************************************
 */
 
-void Dozimeter_SBM19_Init(void) {
-	HAL_TIM_Base_Start(&htim3);
-	HAL_TIM_Base_Start_IT(&htim3);
-	HAL_TIM_Base_Start(&htim4);
+void Dozimeter_set_TIM3_flag(uint8_t _flag) {
+	tim3_flag_u8 = _flag;
+}
+//************************************************************************
 
+void Dozimeter_set_time_between_electrons(void) {
+	electron_array_count_u8++;
+	if (electron_array_count_u8 >= VALUE_ARRAY_CNT) electron_array_count_u8 = 0;
+	radiation_u32_arr[electron_array_count_u8] = TIM4->CNT;
+	TIM4->CNT = 0;
+	electron_hard_count_u32++;
+	update_flag_u8 = 1;
+}
+//************************************************************************
+
+void Dozimeter_Init(void) {
 	int soft_version_arr_int[3];
 	soft_version_arr_int[0] = ((SOFT_VERSION) / 100)     ;
 	soft_version_arr_int[1] = ((SOFT_VERSION) /  10) %10 ;
@@ -154,62 +163,46 @@ void Dozimeter_SBM19_Init(void) {
 	HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
 
 	for (int i=0; i<VALUE_ARRAY_CNT; i++) {
-	  radiation_u32_arr[i] = START_VALUE;
+	  radiation_u32_arr[i] = 60000 / START_RADIATION_VALUE;
 	}
+
+	HAL_TIM_Base_Start(&htim3);
+	HAL_TIM_Base_Start_IT(&htim3);
+	HAL_TIM_Base_Start(&htim4);
 }
 //************************************************************************
 
-void Dozimeter_SBM19_Main(void) {
+void Dozimeter_Main(void) {
 	char DataChar[100];
-	 if (tim3_flag_u8 == 1) {
-		  	  sprintf(DataChar,"\t\t\t\tTIM3 60Sec. Hard_CNT= %d imp;\r\n", count_electrons_i);
-		  	  HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
-		  	  count_electrons_i = 0;
-			  tim3_flag_u8 = 0;
-		  }
 
-		  if (time_between_electrons_u32 > 0) {
+	if (tim3_flag_u8 == 1) {
+		sprintf(DataChar,"\t\t\t\tTIM3 60Sec. Hard_CNT= %d imp;\r\n", (int)electron_hard_count_u32);
+		HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
+		electron_hard_count_u32 = 0;
+		tim3_flag_u8 = 0;
+	}
+	//************************************************************************
 
-			  count_electrons_i++;
+	if (update_flag_u8 > 0) {
 
-			  for (int i=0; i < VALUE_ARRAY_CNT-1; i++) {
-				  radiation_u32_arr[i] = radiation_u32_arr[i+1];
-			  }
+		uint32_t summa_of_all_array_u32 = 0;
+		for (int i=0; i<VALUE_ARRAY_CNT; i++) {
+			summa_of_all_array_u32 = summa_of_all_array_u32 + radiation_u32_arr[i];
+		}
+		uint32_t qnt_electrons_per_60sec_u32 = ( 60000 * VALUE_ARRAY_CNT ) / summa_of_all_array_u32;
 
-			  radiation_u32_arr[VALUE_ARRAY_CNT-1] = time_between_electrons_u32;
+		sprintf (DataChar, "%d) \t%04d \t%d \t CNT: %03d \r\n",
+				(int)electron_array_count_u8,
+				(int)radiation_u32_arr[electron_array_count_u8],
+				(int)summa_of_all_array_u32,
+				(int)qnt_electrons_per_60sec_u32 );
+		HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
 
-		  	  sprintf(DataChar,"%d) \t%04d", count_electrons_i, (int)radiation_u32_arr[VALUE_ARRAY_CNT-1]);
-		  	  HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
+		Print_radiation(qnt_electrons_per_60sec_u32);
 
-			  uint32_t res_doz_u32 = 0;
-			  for (int i=0; i<VALUE_ARRAY_CNT; i++) {
-				  res_doz_u32 = res_doz_u32 + radiation_u32_arr[i];
-			  }
-
-			  sprintf(DataChar,"\t%d \t CNT: %03d \r\n", (int)res_doz_u32, (int)(( 60000 * VALUE_ARRAY_CNT ) / res_doz_u32));
-			  HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
-
-			  res_doz_u32 = ( 60000 * VALUE_ARRAY_CNT ) / res_doz_u32 ;
-
-			  Print_radiation(res_doz_u32);
-
-			  HAL_GPIO_WritePin(LED__GREEN_GPIO_Port,	LED__GREEN_Pin,	SET);
-			  HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port,	LED_YELLOW_Pin, SET);
-			  HAL_GPIO_WritePin(LED____RED_GPIO_Port,	LED____RED_Pin, SET);
-
-			  switch (led_count_u8) {
-				  case 0: HAL_GPIO_WritePin(LED__GREEN_GPIO_Port,	LED__GREEN_Pin,	RESET); break;
-				  case 1: HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port,	LED_YELLOW_Pin, RESET); break;
-				  case 2: HAL_GPIO_WritePin(LED____RED_GPIO_Port,	LED____RED_Pin,	RESET);	break;
-				  case 3: HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port,	LED_YELLOW_Pin, RESET); break;
-				  default: break;
-			  }
-
-			  led_count_u8++;
-			  if (led_count_u8 > 3) led_count_u8 = 0;
-
-			  time_between_electrons_u32 = 0;
-		  }
+		LED_Blink(electron_array_count_u8%4);
+		update_flag_u8 = 0;
+	}
 }
 
 /*
@@ -217,6 +210,21 @@ void Dozimeter_SBM19_Main(void) {
 *                           LOCAL FUNCTIONS
 **************************************************************************
 */
+
+void LED_Blink(uint8_t _position_u8) {
+	HAL_GPIO_WritePin(LED__GREEN_GPIO_Port,	LED__GREEN_Pin,	SET);
+	HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port,	LED_YELLOW_Pin, SET);
+	HAL_GPIO_WritePin(LED____RED_GPIO_Port,	LED____RED_Pin, SET);
+
+	switch (_position_u8) {
+		case 0: HAL_GPIO_WritePin(LED__GREEN_GPIO_Port,	LED__GREEN_Pin,	RESET); break;
+		case 1: HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port,	LED_YELLOW_Pin, RESET); break;
+		case 2: HAL_GPIO_WritePin(LED____RED_GPIO_Port,	LED____RED_Pin,	RESET);	break;
+		case 3: HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port,	LED_YELLOW_Pin, RESET); break;
+		default: break;
+	}
+}
+//************************************************************************
 
 void Print_radiation(uint32_t _radiation_u32)	{
 	uint8_t digit_1_u8 = _radiation_u32 / 10 ;
@@ -252,33 +260,19 @@ void Print_radiation(uint32_t _radiation_u32)	{
 	if (digit_2_u8==9) Print_d2_9();
 	if (digit_2_u8 >9) Print_d2_F();
 }
+//************************************************************************
 
 /*----------------------------------------------------------------------------
   Switch on
  *----------------------------------------------------------------------------*/
-void Port_A_Off (uint8_t _bit_u8)	{
-	GPIOA->BRR = port_mask_UL[_bit_u8];	// Turn On  LED
-}
+void Port_A_Off (uint8_t _bit_u8)	{	GPIOA->BRR  = port_mask_UL[_bit_u8];	}
+void Port_A_On  (uint8_t _bit_u8)	{	GPIOA->BSRR = port_mask_UL[_bit_u8];	}
 
-void Port_A_On (uint8_t _bit_u8)	{
-	GPIOA->BSRR  = port_mask_UL[_bit_u8];	// Turn Off LED
-}
+void Port_B_Off (uint8_t _bit_u8)	{	GPIOB->BRR  = port_mask_UL[_bit_u8];	}
+void Port_B_On  (uint8_t _bit_u8)	{	GPIOB->BSRR = port_mask_UL[_bit_u8];	}
 
-void Port_B_Off (uint8_t _bit_u8)	{
-	GPIOB->BRR = port_mask_UL[_bit_u8];	// Turn On  LED
-}
-
-void Port_B_On (uint8_t _bit_u8)	{
-	GPIOB->BSRR  = port_mask_UL[_bit_u8];	// Turn Off LED
-}
-
-void Port_C_Off (uint8_t _bit_u8)	{
-	GPIOC->BRR = port_mask_UL[_bit_u8];	// Turn On  LED
-}
-
-void Port_C_On (uint8_t _bit_u8)	{
-	GPIOC->BSRR  = port_mask_UL[_bit_u8];	// Turn Off LED
-}
+void Port_C_Off (uint8_t _bit_u8)	{	GPIOC->BRR  = port_mask_UL[_bit_u8];	}
+void Port_C_On  (uint8_t _bit_u8)	{	GPIOC->BSRR = port_mask_UL[_bit_u8];	}
 
 /*----------------------------------------------------------------------------
   Letter
@@ -335,17 +329,17 @@ void Print_d1_4 (void)	{
 
 void Print_d1_5 (void)	{
 	Port_A_On  (12);	//	a
-	Port_A_Off  (11);	//	b
+	Port_A_Off (11);	//	b
 	Port_A_On  ( 8);	//	c
 	Port_B_On  (15);	//	d
-	Port_B_Off  (14);	//	e
+	Port_B_Off (14);	//	e
 	Port_B_On  (13);	//	f
 	Port_B_On  (12);	//	g
 } /*----------------------------------------------------------------------------*/
 
 void Print_d1_6 (void)	{
 	Port_A_On  (12);	//	a
-	Port_A_Off  (11);	//	b
+	Port_A_Off (11);	//	b
 	Port_A_On  ( 8);	//	c
 	Port_B_On  (15);	//	d
 	Port_B_On  (14);	//	e
@@ -357,10 +351,10 @@ void Print_d1_7 (void)	{
 	Port_A_On  (12);	//	a
 	Port_A_On  (11);	//	b
 	Port_A_On  ( 8);	//	c
-	Port_B_Off  (15);	//	d
-	Port_B_Off  (14);	//	e
-	Port_B_Off  (13);	//	f
-	Port_B_Off  (12);	//	g
+	Port_B_Off (15);	//	d
+	Port_B_Off (14);	//	e
+	Port_B_Off (13);	//	f
+	Port_B_Off (12);	//	g
 } /*----------------------------------------------------------------------------*/
 
 void Print_d1_8 (void)	{
@@ -404,13 +398,13 @@ void Print_d1_B (void)	{
 } /*----------------------------------------------------------------------------*/
 
 void Print_d1_C (void)	{
-	Port_A_On (12);	//	a
+	Port_A_On  (12);	//	a
 	Port_A_Off (11);	//	b
 	Port_A_Off ( 8);	//	c
 	Port_B_On  (15);	//	d
 	Port_B_On  (14);	//	e
 	Port_B_On  (13);	//	f
-	Port_B_Off  (12);	//	g
+	Port_B_Off (12);	//	g
 } /*----------------------------------------------------------------------------*/
 
 void Print_d1_D (void)	{

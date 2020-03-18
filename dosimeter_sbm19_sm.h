@@ -35,7 +35,9 @@
 *								    DEFINES
 **************************************************************************
 */
-	#define SOFT_VERSION 	110
+	#define SOFT_VERSION 			110
+	#define	START_RADIATION_VALUE	95
+	#define	VALUE_ARRAY_CNT			100
 /*
 **************************************************************************
 *								   DATA TYPES
@@ -59,7 +61,9 @@
 *                              FUNCTION PROTOTYPES
 **************************************************************************
 */
-	void Dozimeter_SBM19_Init(void);
-	void Dozimeter_SBM19_Main(void);
+	void Dozimeter_Init(void);
+	void Dozimeter_Main(void);
+	void Dozimeter_set_TIM3_flag(uint8_t _flag);
+	void Dozimeter_set_time_between_electrons(void);
 
 #endif /* DOSIMETER_SBM19_SM_H_INCLUDED */
