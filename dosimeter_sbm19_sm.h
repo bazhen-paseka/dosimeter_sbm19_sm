@@ -24,16 +24,18 @@
 *								INCLUDE FILES
 **************************************************************************
 */
-
 	#include "stm32f1xx_hal.h"
+	#include "usart.h"
+	#include "gpio.h"
+	#include "stm32f1xx_hal.h"
+	#include "stdio.h"
 	#include <string.h>
-
 /*
 **************************************************************************
 *								    DEFINES
 **************************************************************************
 */
-
+	#define SOFT_VERSION 	100
 /*
 **************************************************************************
 *								   DATA TYPES
@@ -59,7 +61,7 @@
 *                              FUNCTION PROTOTYPES
 **************************************************************************
 */
-
-	void Indikator(uint32_t dozator);
+	void Dozimeter_sbm19_Init(void);
+	void Dozimeter_sbm19_Main(void);
 
 #endif /* DOSIMETER_SBM19_SM_H_INCLUDED */

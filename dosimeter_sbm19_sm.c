@@ -20,9 +20,7 @@
 *							INCLUDE FILES
 **************************************************************************
 */
-
 	#include "dosimeter_sbm19_sm.h"
-
 /*
 **************************************************************************
 *							LOCAL DEFINES
@@ -56,6 +54,9 @@
 **************************************************************************
 */
 
+	//extern UART_HandleTypeDef huart3;
+	extern TIM_HandleTypeDef htim3;
+	extern TIM_HandleTypeDef htim4;
 
 /*
 **************************************************************************
@@ -82,11 +83,20 @@ const unsigned long port_mask[] = {
 	1UL<<0x0F		/* 15 LED PC 15 */
  };
 
+#define		DOZ_ARRAY	100
+volatile 	uint8_t tim3_flag_u8 		= 0;
+volatile 	uint32_t time_between_electrons_u32 		= 0;
+			uint8_t led_count_u8	= 0;
+			uint32_t doz_u32_arr[DOZ_ARRAY];
+	int		count_electrons_i = 0;
+
 /*
 **************************************************************************
 *                        LOCAL FUNCTION PROTOTYPES
 **************************************************************************
 */
+
+	void Indikator(uint32_t dozator);
 
 	void Port_A_Off (uint32_t num);
 	void Port_A_On (uint32_t num);
@@ -130,7 +140,79 @@ const unsigned long port_mask[] = {
 *                           GLOBAL FUNCTIONS
 **************************************************************************
 */
+void Dozimeter_sbm19_Init(void) {
+	HAL_TIM_Base_Start(&htim3);
+	HAL_TIM_Base_Start_IT(&htim3);
+	HAL_TIM_Base_Start(&htim4);
 
+	int soft_version_arr_int[3];
+	soft_version_arr_int[0] = ((SOFT_VERSION) / 100)     ;
+	soft_version_arr_int[1] = ((SOFT_VERSION) /  10) %10 ;
+	soft_version_arr_int[2] = ((SOFT_VERSION)      ) %10 ;
+
+	char DataChar[100];
+	sprintf(DataChar,"\r\n Dosimeter SBM19 2020-march-18 v%d.%d.%d \r\nUART3 for debug on speed 115200\r\n\r\n",
+			soft_version_arr_int[0], soft_version_arr_int[1], soft_version_arr_int[2]);
+	HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+	for (int i=0; i<DOZ_ARRAY; i++) {
+	  doz_u32_arr[i] = 1000;
+	}
+}
+//************************************************************************
+
+void Dozimeter_sbm19_Main(void) {
+	char DataChar[100];
+	 if (tim3_flag_u8 == 1) {
+		  	  sprintf(DataChar,"\t\t\t\tTIM3 60Sec. Hard_CNT= %d imp;\r\n", count_electrons_i);
+		  	  HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
+		  	  count_electrons_i = 0;
+			  tim3_flag_u8 = 0;
+		  }
+
+		  if (time_between_electrons_u32 > 0) {
+
+			  count_electrons_i++;
+
+			  for (int i=0; i < DOZ_ARRAY-1; i++) {
+				  doz_u32_arr[i] = doz_u32_arr[i+1];
+			  }
+
+			  doz_u32_arr[DOZ_ARRAY-1] = time_between_electrons_u32;
+
+		  	  sprintf(DataChar,"%d) \t%04d", count_electrons_i, (int)doz_u32_arr[DOZ_ARRAY-1]);
+		  	  HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+			  uint32_t res_doz_u32 = 0;
+			  for (int i=0; i<DOZ_ARRAY; i++) {
+				  res_doz_u32 = res_doz_u32 + doz_u32_arr[i];
+			  }
+
+			  sprintf(DataChar,"\t%d \t CNT: %03d \r\n", (int)res_doz_u32, (int)(( 60000 * DOZ_ARRAY ) / res_doz_u32));
+			  HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+			  res_doz_u32 = ( 60000 * DOZ_ARRAY ) / res_doz_u32 ;
+
+			  Indikator(res_doz_u32);
+
+			  HAL_GPIO_WritePin(LED__GREEN_GPIO_Port,	LED__GREEN_Pin,	SET);
+			  HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port,	LED_YELLOW_Pin, SET);
+			  HAL_GPIO_WritePin(LED____RED_GPIO_Port,	LED____RED_Pin, SET);
+
+			  switch (led_count_u8) {
+				  case 0: HAL_GPIO_WritePin(LED__GREEN_GPIO_Port,	LED__GREEN_Pin,	RESET); break;
+				  case 1: HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port,	LED_YELLOW_Pin, RESET); break;
+				  case 2: HAL_GPIO_WritePin(LED____RED_GPIO_Port,	LED____RED_Pin,	RESET);	break;
+				  case 3: HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port,	LED_YELLOW_Pin, RESET); break;
+				  default: break;
+			  }
+
+			  led_count_u8++;
+			  if (led_count_u8 > 3) led_count_u8 = 0;
+
+			  time_between_electrons_u32 = 0;
+		  }
+}
 void Indikator(uint32_t dozator)	{
 	uint8_t doza_10 = dozator/10;
 	uint8_t doza_01 = dozator-((doza_10)*10);
@@ -165,9 +247,6 @@ void Indikator(uint32_t dozator)	{
 	if (doza_01==9) Letter_2_9();
 	if (doza_01 >9) Letter_2_F();
 }
-//************************************************************************
-
-
 //************************************************************************
 
 
