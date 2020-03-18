@@ -25,9 +25,9 @@
 **************************************************************************
 */
 	#include "stm32f1xx_hal.h"
-	#include "usart.h"
 	#include "gpio.h"
-	#include "stm32f1xx_hal.h"
+	#include "tim.h"
+	#include "usart.h"
 	#include "stdio.h"
 	#include <string.h>
 /*
@@ -35,7 +35,7 @@
 *								    DEFINES
 **************************************************************************
 */
-	#define SOFT_VERSION 	100
+	#define SOFT_VERSION 	110
 /*
 **************************************************************************
 *								   DATA TYPES
@@ -48,8 +48,6 @@
 **************************************************************************
 */
 
-
-
 /*
 **************************************************************************
 *									 MACRO'S
@@ -61,7 +59,7 @@
 *                              FUNCTION PROTOTYPES
 **************************************************************************
 */
-	void Dozimeter_sbm19_Init(void);
-	void Dozimeter_sbm19_Main(void);
+	void Dozimeter_SBM19_Init(void);
+	void Dozimeter_SBM19_Main(void);
 
 #endif /* DOSIMETER_SBM19_SM_H_INCLUDED */
