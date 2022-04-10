@@ -83,7 +83,7 @@ uint8_t		update_flag_u8 			= 0;
 uint8_t 	led_count_u8			= 0;
 uint8_t		electron_array_count_u8	= 0;
 uint32_t	electron_hard_count_u32	= 0;
-uint32_t 	radiation_u32_arr[VALUE_ARRAY_CNT];
+uint32_t 	one_electron_time_u32_arr[VALUE_ARRAY_CNT];
 
 /*
 **************************************************************************
@@ -144,7 +144,7 @@ void Dozimeter_set_TIM3_flag(uint8_t _flag) {
 void Dozimeter_set_time_between_electrons(void) {
 	electron_array_count_u8++;
 	if (electron_array_count_u8 >= VALUE_ARRAY_CNT) electron_array_count_u8 = 0;
-	radiation_u32_arr[electron_array_count_u8] = TIM4->CNT;
+	one_electron_time_u32_arr[electron_array_count_u8] = TIM4->CNT;
 	TIM4->CNT = 0;
 	electron_hard_count_u32++;
 	update_flag_u8 = 1;
@@ -158,17 +158,28 @@ void Dozimeter_Init(void) {
 	soft_version_arr_int[2] = ((SOFT_VERSION)      ) %10 ;
 
 	char DataChar[100];
-	sprintf(DataChar,"\r\n Dosimeter SBM19 2020-march-18 v%d.%d.%d \r\n\tUART3 for debug on speed 115200\r\n\r\n",
+	sprintf(DataChar,"\r\n Dosimeter SBM19 2022-April-10 v%d.%d.%d\r\n",
 			soft_version_arr_int[0], soft_version_arr_int[1], soft_version_arr_int[2]);
 	HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
 
+	#define 	DATE_as_int_str 	(__DATE__)
+	#define 	TIME_as_int_str 	(__TIME__)
+	sprintf(DataChar," Build: %s. Time: %s\r\n" ,
+		DATE_as_int_str ,
+		TIME_as_int_str ) ;
+	HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+	sprintf(DataChar," UART3 for debug on speed 115200\r\n\r\n" );
+	HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
+
 	for (int i=0; i<VALUE_ARRAY_CNT; i++) {
-	  radiation_u32_arr[i] = 60000 / START_RADIATION_VALUE;
+	  one_electron_time_u32_arr[i] = 60000 / START_RADIATION_VALUE;
 	}
 
 	HAL_TIM_Base_Start(&htim3);
 	HAL_TIM_Base_Start_IT(&htim3);
 	HAL_TIM_Base_Start(&htim4);
+	tim3_flag_u8 = 0 ;
 }
 //************************************************************************
 
@@ -176,7 +187,7 @@ void Dozimeter_Main(void) {
 	char DataChar[100];
 
 	if (tim3_flag_u8 == 1) {
-		sprintf(DataChar,"\t\t\t\tTIM3 60Sec. Hard_CNT= %d imp;\r\n", (int)electron_hard_count_u32);
+		sprintf(DataChar," TIM3=60Sec hard-cnt= %d imp\r\n\r\n", (int)electron_hard_count_u32);
 		HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
 		electron_hard_count_u32 = 0;
 		tim3_flag_u8 = 0;
@@ -187,15 +198,16 @@ void Dozimeter_Main(void) {
 
 		uint32_t summa_of_all_array_u32 = 0;
 		for (int i=0; i<VALUE_ARRAY_CNT; i++) {
-			summa_of_all_array_u32 = summa_of_all_array_u32 + radiation_u32_arr[i];
+			summa_of_all_array_u32 = summa_of_all_array_u32 + one_electron_time_u32_arr[i];
 		}
 		uint32_t qnt_electrons_per_60sec_u32 = ( 60000 * VALUE_ARRAY_CNT ) / summa_of_all_array_u32;
 
-		sprintf (DataChar, "%d) \t%04d \t%d \t CNT: %03d \r\n",
-				(int)electron_array_count_u8,
-				(int)radiation_u32_arr[electron_array_count_u8],
-				(int)summa_of_all_array_u32,
-				(int)qnt_electrons_per_60sec_u32 );
+		sprintf (DataChar, "hard-cnt60sec:%02d\t cnt100:%02d\t one-electron-time: %04d\t 100-time-suma:%d\t calc-per60sec: %03d\r\n",
+				(int) electron_hard_count_u32 							,
+				(int) electron_array_count_u8							,
+				(int) one_electron_time_u32_arr[electron_array_count_u8],
+				(int) summa_of_all_array_u32							,
+				(int) qnt_electrons_per_60sec_u32						) ;
 		HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
 
 		Print_radiation(qnt_electrons_per_60sec_u32);
