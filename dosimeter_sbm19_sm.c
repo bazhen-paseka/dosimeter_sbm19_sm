@@ -210,7 +210,7 @@ void Dozimeter_Main(void) {
 				(int) qnt_electrons_per_60sec_u32						) ;
 		HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
 
-		Print_radiation(qnt_electrons_per_60sec_u32);
+		Print_radiation( qnt_electrons_per_60sec_u32 / 5 ) ;	// div by 5 щоб замість 100 показувало 20  {v1.2.1}
 
 		LED_Blink(electron_array_count_u8%4);
 		update_flag_u8 = 0;

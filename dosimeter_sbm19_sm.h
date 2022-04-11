@@ -35,7 +35,7 @@
 *								    DEFINES
 **************************************************************************
 */
-	#define SOFT_VERSION 			120
+	#define SOFT_VERSION 			121
 	#define	START_RADIATION_VALUE	95
 	#define	VALUE_ARRAY_CNT			100
 /*
