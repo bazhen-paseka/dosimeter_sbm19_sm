@@ -84,14 +84,21 @@ const unsigned long port_mask_UL[] = {
 	uint8_t		electron_array_count_u8	= 0;
 	uint32_t	electron_hard_count_u32	= 0;
 	uint32_t 	one_electron_time_u32_arr[VALUE_ARRAY_CNT];
-
+	#ifdef	DISPLAY_TM1637
+		tm1637_struct 	h1_tm1637;
+	#endif
 /*
 **************************************************************************
 *                        LOCAL FUNCTION PROTOTYPES
 **************************************************************************
 */
-	void LED_Blink(uint8_t _position_u8);
-	void Print_radiation(uint32_t _radiation_u32);
+	void LED_Blink	(uint8_t _position_u8);
+	void Buzzer_Beep(void);
+	#ifdef DISPLAY_TM1637
+		void Display_radiation_TM1637(tm1637_struct* htm1637, uint32_t _radiation_u32);
+	#else
+		void Display_radiation(uint32_t _radiation_u32);
+	#endif
 
 	void Port_A_Off (uint8_t _bit_u8);
 	void Port_A_On  (uint8_t _bit_u8);
@@ -154,14 +161,34 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {	//	irqq tim
 } //**************************************************************************
 
 void Dozimeter_Init(void) {
+	DWT_Delay_Init();
 	DebugSoftVersion(SOFT_VERSION);
-	DBG1("\t Debug: UART3 / 62500\r\n\r\n");
+	DBG1("\t Debug: UART1 / 62500\r\n");
 	for (int i=0; i<VALUE_ARRAY_CNT; i++) {
 	  one_electron_time_u32_arr[i] = 60000 / START_RADIATION_VALUE;
 	}
+
+	#ifdef	DISPLAY_TM1637
+		DBG1("\t Display: TM1637\r\n");
+		DBG1("\t     LED: 4 pcs\r\n");
+		h1_tm1637.clk_pin  = TM1637_CLK_Pin;
+		h1_tm1637.clk_port = TM1637_CLK_GPIO_Port;
+		h1_tm1637.dio_pin  = TM1637_DIO_Pin;
+		h1_tm1637.dio_port = TM1637_DIO_GPIO_Port;
+		h1_tm1637.digit_qnt= 4;
+		TM1637_Init(&h1_tm1637);
+		TM1637_Set_Brightness(&h1_tm1637, bright_15percent);
+		TM1637_Display_Decimal(&h1_tm1637, SOFT_VERSION , no_double_dot, symbol_dec);
+		HAL_Delay(1000);
+	#else
+		DBG1("\t Display: simple 2 digits\r\n");
+		DBG1("\t     LED: 3 pcs\r\n");
+	#endif
+
 	HAL_TIM_Base_Start_IT( &TIM_60_SEC  );
 	HAL_TIM_Base_Start   ( &TIM_BETWEEN );
 	tim3_flag_u8 = 0 ;
+	DBG1("\t End Init.\r\n\r\n");
 } //************************************************************************
 
 void Dozimeter_Main(void) {
@@ -171,6 +198,7 @@ void Dozimeter_Main(void) {
 		tim3_flag_u8 = 0;
 	}
 	if (update_flag_u8 > 0) {
+		Buzzer_Beep();
 		uint32_t summa_of_all_array_u32 = 0;
 		for (int i=0; i<VALUE_ARRAY_CNT; i++) {
 			summa_of_all_array_u32 = summa_of_all_array_u32 + one_electron_time_u32_arr[i];
@@ -182,8 +210,12 @@ void Dozimeter_Main(void) {
 				(int) one_electron_time_u32_arr[electron_array_count_u8],
 				(int) summa_of_all_array_u32							,
 				(int) qnt_electrons_per_60sec_u32						) ;
-		Print_radiation( qnt_electrons_per_60sec_u32 / 5 ) ;	// div by 5 щоб замість 100 показувало 20  {v1.2.1}
-		LED_Blink(electron_array_count_u8%4);
+		#ifdef DISPLAY_TM1637
+			Display_radiation_TM1637(&h1_tm1637, qnt_electrons_per_60sec_u32);
+		#else
+			Display_radiation(qnt_electrons_per_60sec_u32);
+		#endif
+		LED_Blink(electron_array_count_u8);
 		update_flag_u8 = 0;
 	}
 } //************************************************************************
@@ -195,20 +227,51 @@ void Dozimeter_Main(void) {
 */
 
 void LED_Blink(uint8_t _position_u8) {
-	HAL_GPIO_WritePin(LED__GREEN_GPIO_Port,	LED__GREEN_Pin,	SET);
-	HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port,	LED_YELLOW_Pin, SET);
-	HAL_GPIO_WritePin(LED____RED_GPIO_Port,	LED____RED_Pin, SET);
-
-	switch (_position_u8) {
-		case 0: HAL_GPIO_WritePin(LED__GREEN_GPIO_Port,	LED__GREEN_Pin,	RESET); break;
-		case 1: HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port,	LED_YELLOW_Pin, RESET); break;
-		case 2: HAL_GPIO_WritePin(LED____RED_GPIO_Port,	LED____RED_Pin,	RESET);	break;
-		case 3: HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port,	LED_YELLOW_Pin, RESET); break;
-		default: break;
-	}
+	#ifdef LED_4_PCS
+		_position_u8 = _position_u8 % 6;
+		HAL_GPIO_WritePin(LED_1_GPIO_Port,	LED_1_Pin, RESET);
+		HAL_GPIO_WritePin(LED_2_GPIO_Port,	LED_2_Pin, RESET);
+		HAL_GPIO_WritePin(LED_3_GPIO_Port,	LED_3_Pin, RESET);
+		HAL_GPIO_WritePin(LED_4_GPIO_Port,	LED_4_Pin, RESET);
+		switch (_position_u8) {
+			case 0: HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, SET); break;
+			case 1: HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, SET); break;
+			case 2: HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, SET); break;
+			case 3: HAL_GPIO_WritePin(LED_4_GPIO_Port, LED_4_Pin, SET); break;
+			case 4: HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, SET); break;
+			case 5: HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, SET); break;
+			default: break;
+		}
+	#else
+		_position_u8 = _position_u8 % 4;
+		HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, SET);
+		HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, SET);
+		HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, SET);
+		switch (_position_u8) {
+			case 0: HAL_GPIO_WritePin(LED_1_GPIO_Port, LED_1_Pin, RESET); break;
+			case 1: HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, RESET); break;
+			case 2: HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, RESET); break;
+			case 3: HAL_GPIO_WritePin(LED_2_GPIO_Port, LED_2_Pin, RESET); break;
+			default: break;
+		}
+	#endif
 } //************************************************************************
 
-void Print_radiation(uint32_t _radiation_u32)	{
+void Display_radiation_TM1637(tm1637_struct* htm1637, uint32_t _radiation_u32)	{
+	#ifdef DISPLAY_TM1637
+		TM1637_Display_Decimal(htm1637, _radiation_u32, no_double_dot, symbol_dec);
+	#endif
+} //************************************************************************
+
+void Buzzer_Beep (void) {
+	HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, SET);
+	DWT_Delay_us(100);
+	HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, RESET);
+} //************************************************************************
+
+void Display_radiation(uint32_t _radiation_u32)	{
+#ifndef DISPLAY_TM1637
+	_radiation_u32 = _radiation_u32 / HELP_DIVISION ;
 	uint8_t digit_1_u8 = _radiation_u32 / 10 ;
 	uint8_t digit_2_u8 = _radiation_u32 % 10 ;
 
@@ -241,6 +304,7 @@ void Print_radiation(uint32_t _radiation_u32)	{
 	if (digit_2_u8==8) Print_d2_8();
 	if (digit_2_u8==9) Print_d2_9();
 	if (digit_2_u8 >9) Print_d2_F();
+#endif
 } //************************************************************************
 
 /*----------------------------------------------------------------------------
