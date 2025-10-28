@@ -32,6 +32,7 @@
 	#include "usart.h"
 	#include "debug_gx.h"
 	#include "local_config.h"
+	#include "tm1637_sm.h"
 /*
 **************************************************************************
 *								    DEFINES
