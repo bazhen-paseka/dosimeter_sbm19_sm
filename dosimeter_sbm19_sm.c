@@ -158,18 +158,21 @@ void Dozimeter_Init(void) {
 	soft_version_arr_int[2] = ((SOFT_VERSION)      ) %10 ;
 
 	char DataChar[100];
-	sprintf(DataChar,"\r\n Dosimeter SBM19 2022-April-10 v%d.%d.%d\r\n",
+	sprintf(DataChar,"\r\n\t Dosimeter SBM19 v%d.%d.%d\r\n",
 			soft_version_arr_int[0], soft_version_arr_int[1], soft_version_arr_int[2]);
 	HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
 
 	#define 	DATE_as_int_str 	(__DATE__)
 	#define 	TIME_as_int_str 	(__TIME__)
-	sprintf(DataChar," Build: %s. Time: %s\r\n" ,
+	sprintf(DataChar,"\t Build: %s. Time: %s\r\n" ,
 		DATE_as_int_str ,
 		TIME_as_int_str ) ;
 	HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
 
-	sprintf(DataChar," UART3 for debug on speed 115200\r\n\r\n" );
+	sprintf(DataChar,"\t Проєкт: %s\r\n", PROJECT_NAME);
+	HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
+
+	sprintf(DataChar,"\t UART3 for debug on speed 62500\r\n\r\n" );
 	HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
 
 	for (int i=0; i<VALUE_ARRAY_CNT; i++) {
