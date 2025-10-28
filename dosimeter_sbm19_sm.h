@@ -24,20 +24,19 @@
 *								INCLUDE FILES
 **************************************************************************
 */
-	#include "stm32f1xx_hal.h"
+	#include "main.h"
+	#include "stdio.h"
+	#include <string.h>
 	#include "gpio.h"
 	#include "tim.h"
 	#include "usart.h"
-	#include "stdio.h"
-	#include <string.h>
+	#include "debug_gx.h"
 /*
 **************************************************************************
 *								    DEFINES
 **************************************************************************
 */
-	#define SOFT_VERSION 			121
-	#define	START_RADIATION_VALUE	95
-	#define	VALUE_ARRAY_CNT			100
+
 /*
 **************************************************************************
 *								   DATA TYPES

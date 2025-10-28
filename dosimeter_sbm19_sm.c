@@ -136,10 +136,15 @@ uint32_t 	one_electron_time_u32_arr[VALUE_ARRAY_CNT];
 **************************************************************************
 */
 
+void HAL_GPIO_EXTI_Callback (uint16_t GPIO_Pin) {	//	irqq pin
+	if ( GPIO_Pin == SBM19_Pin	) {
+		Dozimeter_set_time_between_electrons();
+	}
+} //**************************************************************************
+
 void Dozimeter_set_TIM3_flag(uint8_t _flag) {
 	tim3_flag_u8 = _flag;
-}
-//************************************************************************
+} //************************************************************************
 
 void Dozimeter_set_time_between_electrons(void) {
 	electron_array_count_u8++;
@@ -148,77 +153,43 @@ void Dozimeter_set_time_between_electrons(void) {
 	TIM4->CNT = 0;
 	electron_hard_count_u32++;
 	update_flag_u8 = 1;
-}
-//************************************************************************
+} //************************************************************************
 
 void Dozimeter_Init(void) {
-	int soft_version_arr_int[3];
-	soft_version_arr_int[0] = ((SOFT_VERSION) / 100)     ;
-	soft_version_arr_int[1] = ((SOFT_VERSION) /  10) %10 ;
-	soft_version_arr_int[2] = ((SOFT_VERSION)      ) %10 ;
-
-	char DataChar[100];
-	sprintf(DataChar,"\r\n\t Dosimeter SBM19 v%d.%d.%d\r\n",
-			soft_version_arr_int[0], soft_version_arr_int[1], soft_version_arr_int[2]);
-	HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
-
-	#define 	DATE_as_int_str 	(__DATE__)
-	#define 	TIME_as_int_str 	(__TIME__)
-	sprintf(DataChar,"\t Build: %s. Time: %s\r\n" ,
-		DATE_as_int_str ,
-		TIME_as_int_str ) ;
-	HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
-
-	sprintf(DataChar,"\t Проєкт: %s\r\n", PROJECT_NAME);
-	HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
-
-	sprintf(DataChar,"\t UART3 for debug on speed 62500\r\n\r\n" );
-	HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
-
+	DebugSoftVersion(SOFT_VERSION);
+	DBG1("\t UART3 for debug on speed 62500\r\n\r\n" );
 	for (int i=0; i<VALUE_ARRAY_CNT; i++) {
 	  one_electron_time_u32_arr[i] = 60000 / START_RADIATION_VALUE;
 	}
-
 	HAL_TIM_Base_Start(&htim3);
 	HAL_TIM_Base_Start_IT(&htim3);
 	HAL_TIM_Base_Start(&htim4);
 	tim3_flag_u8 = 0 ;
-}
-//************************************************************************
+} //************************************************************************
 
 void Dozimeter_Main(void) {
-	char DataChar[100];
-
 	if (tim3_flag_u8 == 1) {
-		sprintf(DataChar," TIM3=60Sec hard-cnt= %d imp\r\n\r\n", (int)electron_hard_count_u32);
-		HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
+		DBG1(" TIM3=60Sec hard-cnt= %d imp\r\n\r\n", (int)electron_hard_count_u32);
 		electron_hard_count_u32 = 0;
 		tim3_flag_u8 = 0;
 	}
-	//************************************************************************
-
 	if (update_flag_u8 > 0) {
-
 		uint32_t summa_of_all_array_u32 = 0;
 		for (int i=0; i<VALUE_ARRAY_CNT; i++) {
 			summa_of_all_array_u32 = summa_of_all_array_u32 + one_electron_time_u32_arr[i];
 		}
 		uint32_t qnt_electrons_per_60sec_u32 = ( 60000 * VALUE_ARRAY_CNT ) / summa_of_all_array_u32;
-
-		sprintf (DataChar, "hard-cnt60sec:%02d\t cnt100:%02d\t one-electron-time: %04d\t 100-time-suma:%d\t calc-per60sec: %03d\r\n",
+		DBG1("hard-cnt60sec:%02d\t cnt100:%02d\t one-electron-time: %04d\t 100-time-suma:%d\t calc-per60sec: %03d\r\n",
 				(int) electron_hard_count_u32 							,
 				(int) electron_array_count_u8							,
 				(int) one_electron_time_u32_arr[electron_array_count_u8],
 				(int) summa_of_all_array_u32							,
 				(int) qnt_electrons_per_60sec_u32						) ;
-		HAL_UART_Transmit(&huart3, (uint8_t *)DataChar, strlen(DataChar), 100);
-
 		Print_radiation( qnt_electrons_per_60sec_u32 / 5 ) ;	// div by 5 щоб замість 100 показувало 20  {v1.2.1}
-
 		LED_Blink(electron_array_count_u8%4);
 		update_flag_u8 = 0;
 	}
-}
+} //************************************************************************
 
 /*
 **************************************************************************
@@ -238,8 +209,7 @@ void LED_Blink(uint8_t _position_u8) {
 		case 3: HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port,	LED_YELLOW_Pin, RESET); break;
 		default: break;
 	}
-}
-//************************************************************************
+} //************************************************************************
 
 void Print_radiation(uint32_t _radiation_u32)	{
 	uint8_t digit_1_u8 = _radiation_u32 / 10 ;
@@ -274,8 +244,7 @@ void Print_radiation(uint32_t _radiation_u32)	{
 	if (digit_2_u8==8) Print_d2_8();
 	if (digit_2_u8==9) Print_d2_9();
 	if (digit_2_u8 >9) Print_d2_F();
-}
-//************************************************************************
+} //************************************************************************
 
 /*----------------------------------------------------------------------------
   Switch on
@@ -577,3 +546,6 @@ void Print_d2_F (void)	{
 	Port_A_On  ( 2);	// f
 	Port_A_On  ( 3);	// g
 } /*----------------------------------------------------------------------------*/
+
+//************************************************************************
+//************************************************************************
