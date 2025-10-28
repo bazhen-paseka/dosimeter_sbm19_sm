@@ -78,12 +78,12 @@ const unsigned long port_mask_UL[] = {
 	1UL<<0x0F		/* 15 LED PC 15 */
  };
 
-uint8_t 	tim3_flag_u8 			= 0;
-uint8_t		update_flag_u8 			= 0;
-uint8_t 	led_count_u8			= 0;
-uint8_t		electron_array_count_u8	= 0;
-uint32_t	electron_hard_count_u32	= 0;
-uint32_t 	one_electron_time_u32_arr[VALUE_ARRAY_CNT];
+	uint8_t 	tim3_flag_u8 			= 0;
+	uint8_t		update_flag_u8 			= 0;
+	uint8_t 	led_count_u8			= 0;
+	uint8_t		electron_array_count_u8	= 0;
+	uint32_t	electron_hard_count_u32	= 0;
+	uint32_t 	one_electron_time_u32_arr[VALUE_ARRAY_CNT];
 
 /*
 **************************************************************************
@@ -138,32 +138,29 @@ uint32_t 	one_electron_time_u32_arr[VALUE_ARRAY_CNT];
 
 void HAL_GPIO_EXTI_Callback (uint16_t GPIO_Pin) {	//	irqq pin
 	if ( GPIO_Pin == SBM19_Pin	) {
-		Dozimeter_set_time_between_electrons();
+		electron_array_count_u8++;
+		if (electron_array_count_u8 >= VALUE_ARRAY_CNT) electron_array_count_u8 = 0;
+		one_electron_time_u32_arr[electron_array_count_u8] = TIM4->CNT;
+		TIM4->CNT = 0;
+		electron_hard_count_u32++;
+		update_flag_u8 = 1;
 	}
 } //**************************************************************************
 
-void Dozimeter_set_TIM3_flag(uint8_t _flag) {
-	tim3_flag_u8 = _flag;
-} //************************************************************************
-
-void Dozimeter_set_time_between_electrons(void) {
-	electron_array_count_u8++;
-	if (electron_array_count_u8 >= VALUE_ARRAY_CNT) electron_array_count_u8 = 0;
-	one_electron_time_u32_arr[electron_array_count_u8] = TIM4->CNT;
-	TIM4->CNT = 0;
-	electron_hard_count_u32++;
-	update_flag_u8 = 1;
-} //************************************************************************
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {	//	irqq tim
+	if ( htim == &TIM_60_SEC ) {
+		tim3_flag_u8 =1;
+	}
+} //**************************************************************************
 
 void Dozimeter_Init(void) {
 	DebugSoftVersion(SOFT_VERSION);
-	DBG1("\t UART3 for debug on speed 62500\r\n\r\n" );
+	DBG1("\t Debug: UART3 / 62500\r\n\r\n");
 	for (int i=0; i<VALUE_ARRAY_CNT; i++) {
 	  one_electron_time_u32_arr[i] = 60000 / START_RADIATION_VALUE;
 	}
-	HAL_TIM_Base_Start(&htim3);
-	HAL_TIM_Base_Start_IT(&htim3);
-	HAL_TIM_Base_Start(&htim4);
+	HAL_TIM_Base_Start_IT( &TIM_60_SEC  );
+	HAL_TIM_Base_Start   ( &TIM_BETWEEN );
 	tim3_flag_u8 = 0 ;
 } //************************************************************************
 

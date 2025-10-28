@@ -31,6 +31,7 @@
 	#include "tim.h"
 	#include "usart.h"
 	#include "debug_gx.h"
+	#include "local_config.h"
 /*
 **************************************************************************
 *								    DEFINES
@@ -62,7 +63,5 @@
 */
 	void Dozimeter_Init(void);
 	void Dozimeter_Main(void);
-	void Dozimeter_set_TIM3_flag(uint8_t _flag);
-	void Dozimeter_set_time_between_electrons(void);
 
 #endif /* DOSIMETER_SBM19_SM_H_INCLUDED */
